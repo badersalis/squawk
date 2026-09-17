@@ -1,6 +1,6 @@
 import { startTracing } from '@squawk/observability';
 
-startTracing({ serviceName: 'schedule', serviceVersion: '0.0.1' });
+startTracing({ serviceName: 'search', serviceVersion: '0.0.1' });
 
 import { Logger, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -16,20 +16,19 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('Schedule service')
+      .setTitle('Search service')
       .setDescription(
-        'Flights, legs, and a simulated fare/revenue feed standing in for the ' +
-          'commercially-gated ATPCO feed a real airline would call here.',
+        'Non-stop itinerary search over Schedule, cached in Redis.',
       )
       .setVersion('1')
       .build(),
   );
   SwaggerModule.setup(`${globalPrefix}/docs`, app, swaggerDocument);
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3002;
   await app.listen(port);
   Logger.log(
-    `Schedule service running on: http://localhost:${port}/${globalPrefix}/v1`,
+    `Search service running on: http://localhost:${port}/${globalPrefix}/v1`,
   );
   Logger.log(`API docs: http://localhost:${port}/${globalPrefix}/docs`);
 }
