@@ -33,12 +33,16 @@ than farmed out to a framework:
   as a public contract.
 - **OpenTelemetry from the start** — every request and every saga step is traceable
   end to end.
+- **Every service is versioned and self-documenting.** URI versioning (`/api/v1/...`),
+  health checks excluded since infra tooling — not API consumers — calls those. Each
+  service publishes its own OpenAPI spec at `/api/docs`.
 
 ```
 /apps                   one deployable NestJS app per bounded context
-  /schedule              flights, legs, simulated fare feed (the only service so far)
+  /schedule              flights, legs, simulated fare feed
+  /search                non-stop itinerary search over Schedule, cached in Redis
 /libs
-  /domain                shared domain types (Flight, Segment, BookingClass, Offer, Order)
+  /domain                shared domain types (Flight, Segment, BookingClass, Offer, Order, Itinerary)
   /observability          OpenTelemetry bootstrap, shared instrumentation
   /testing                Testcontainers-based test helpers
 /infra
@@ -52,15 +56,27 @@ Each service is layered hexagonally: `domain` (no framework, no DB), `applicatio
 
 ## Status
 
-**Step 2 of the roadmap: Schedule + simulated feed.** One service exists — **Schedule** —
-exposing:
+**Step 3 of the roadmap: Search/read path + caching.** Two services exist:
 
-- `GET /api/health`
-- `GET /api/flights` — seeded, in-memory flight data
-- `GET /api/flights/:flightId/fares/:bookingClassCode` — a simulated fare/revenue feed
+**Schedule** — flights, legs, simulated fare feed:
+
+- `GET /api/health` — version-neutral
+- `GET /api/v1/flights` — seeded, in-memory flight data
+- `GET /api/v1/flights/:flightId/fares/:bookingClassCode` — a simulated fare/revenue feed
   (`FareFeedPort` / `FakeFareFeedAdapter`) standing in for the commercially-gated ATPCO
   feed a real airline would call here. Pricing is deterministic per flight+class but
   otherwise made up.
+
+**Search** — non-stop itinerary search, read path only:
+
+- `GET /api/health` — version-neutral
+- `GET /api/v1/itineraries?origin=JFK&destination=LAX` — calls Schedule
+  (`SchedulePort` / `HttpScheduleAdapter`), wraps each matching flight as a non-stop
+  `Itinerary`, and caches the result in Redis for 60s (`ItineraryCachePort` /
+  `RedisItineraryCacheAdapter`). Multi-leg connection-building is out of scope for this
+  step.
+
+Both services publish OpenAPI docs at `GET /api/docs`.
 
 There is no database wiring, no saga, no seat-hold logic yet — Postgres only enters the
 picture once Inventory/Orders need a real source of truth (roadmap step 5). See
@@ -79,30 +95,42 @@ conflict), Redpanda (`9092`), the OTel collector (`4317`/`4318`), Tempo (`3200`)
 (`9090`), and Grafana (`3001`, anonymous access, Tempo + Prometheus pre-provisioned as
 datasources).
 
-Run the Schedule service against that collector:
+Run both services against that collector (separate terminals, or use the npm scripts
+below which wire up the right env vars):
 
 ```
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 npx nx serve @squawk/schedule
+npm run serve:schedule   # http://localhost:3000
+npm run serve:search     # http://localhost:3002
 ```
 
 Then:
 
 ```
 curl http://localhost:3000/api/health
-curl http://localhost:3000/api/flights
-curl http://localhost:3000/api/flights/flt_aa100/fares/Y
+curl http://localhost:3000/api/v1/flights
+curl http://localhost:3000/api/v1/flights/flt_aa100/fares/Y
+curl "http://localhost:3002/api/v1/itineraries?origin=JFK&destination=LAX"
 ```
 
-Open Grafana at http://localhost:3001, go to **Explore → Tempo**, and search by
-`service.name = schedule` to see the traces for those two requests.
+Open http://localhost:3000/api/docs or http://localhost:3002/api/docs for each
+service's interactive OpenAPI UI.
+
+Open Grafana at http://localhost:3001 (that port is Grafana's alone — Search runs on
+3002 to avoid colliding with it), go to **Explore → Tempo**, and search by
+`service.name = schedule` or `service.name = search` to see traces, including the
+itinerary lookup calling out to Schedule.
 
 ## Verifying
 
 ```
-npx nx build @squawk/schedule       # compiles the service
-npx nx test @squawk/schedule        # builds the service's real Dockerfile with
-                                     # Testcontainers, boots it, and hits it over HTTP
+npx nx build @squawk/schedule @squawk/search   # compiles both services
+npx nx test @squawk/schedule                    # builds Schedule's real Dockerfile with
+                                                 # Testcontainers, boots it, hits it over HTTP
+npx nx test @squawk/search                      # unit tests the caching logic, then wires
+                                                 # real Redis + Schedule + Search containers
+                                                 # together and proves the cache keeps
+                                                 # answering after Schedule is stopped
 ```
 
-The test doesn't import the app in-process — it builds and runs the same Docker image
-that would ship, which is what "production-shaped" is meant to buy you.
+Tests build and run the services' real Docker images rather than importing the app
+in-process — that's what "production-shaped" is meant to buy you.

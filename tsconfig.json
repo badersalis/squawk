@@ -14,6 +14,9 @@
     },
     {
       "path": "./libs/testing"
+    },
+    {
+      "path": "./apps/search"
     }
   ],
   "compilerOptions": {}

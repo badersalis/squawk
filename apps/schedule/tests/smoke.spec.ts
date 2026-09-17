@@ -27,15 +27,15 @@ describe('schedule service smoke test', () => {
     await container?.stop();
   });
 
-  it('answers a health check', async () => {
+  it('answers a health check (version-neutral)', async () => {
     const response = await fetch(`${baseUrl}/api/health`);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe('ok');
   });
 
-  it('answers the seeded flights read endpoint', async () => {
-    const response = await fetch(`${baseUrl}/api/flights`);
+  it('answers the seeded flights read endpoint under v1', async () => {
+    const response = await fetch(`${baseUrl}/api/v1/flights`);
     expect(response.status).toBe(200);
     const flights = await response.json();
     expect(Array.isArray(flights)).toBe(true);
@@ -44,7 +44,7 @@ describe('schedule service smoke test', () => {
   });
 
   it('answers the simulated fare feed for a known flight and booking class', async () => {
-    const response = await fetch(`${baseUrl}/api/flights/flt_aa100/fares/Y`);
+    const response = await fetch(`${baseUrl}/api/v1/flights/flt_aa100/fares/Y`);
     expect(response.status).toBe(200);
     const fare = await response.json();
     expect(fare).toMatchObject({ bookingClassCode: 'Y', currency: 'USD' });
@@ -52,7 +52,13 @@ describe('schedule service smoke test', () => {
   });
 
   it('404s for an unknown booking class', async () => {
-    const response = await fetch(`${baseUrl}/api/flights/flt_aa100/fares/Z`);
+    const response = await fetch(`${baseUrl}/api/v1/flights/flt_aa100/fares/Z`);
     expect(response.status).toBe(404);
+  });
+
+  it('serves the OpenAPI docs UI', async () => {
+    const response = await fetch(`${baseUrl}/api/docs`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('swagger-ui');
   });
 });
