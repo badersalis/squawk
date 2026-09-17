@@ -52,9 +52,18 @@ Each service is layered hexagonally: `domain` (no framework, no DB), `applicatio
 
 ## Status
 
-**Step 1 of the roadmap: foundations + tracing.** One service exists — **Schedule** —
-exposing a health check and a read endpoint over seeded, in-memory flight data. There is
-no database wiring, no saga, no seat-hold logic yet; those arrive in later steps. See
+**Step 2 of the roadmap: Schedule + simulated feed.** One service exists — **Schedule** —
+exposing:
+
+- `GET /api/health`
+- `GET /api/flights` — seeded, in-memory flight data
+- `GET /api/flights/:flightId/fares/:bookingClassCode` — a simulated fare/revenue feed
+  (`FareFeedPort` / `FakeFareFeedAdapter`) standing in for the commercially-gated ATPCO
+  feed a real airline would call here. Pricing is deterministic per flight+class but
+  otherwise made up.
+
+There is no database wiring, no saga, no seat-hold logic yet — Postgres only enters the
+picture once Inventory/Orders need a real source of truth (roadmap step 5). See
 [`docs/adr/`](adr/) for why the initial tooling (Nx, Prisma, Vitest) was chosen.
 
 ## Running it
@@ -81,6 +90,7 @@ Then:
 ```
 curl http://localhost:3000/api/health
 curl http://localhost:3000/api/flights
+curl http://localhost:3000/api/flights/flt_aa100/fares/Y
 ```
 
 Open Grafana at http://localhost:3001, go to **Explore → Tempo**, and search by

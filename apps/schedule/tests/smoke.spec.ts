@@ -42,4 +42,17 @@ describe('schedule service smoke test', () => {
     expect(flights.length).toBeGreaterThan(0);
     expect(flights[0]).toHaveProperty('flightNumber');
   });
+
+  it('answers the simulated fare feed for a known flight and booking class', async () => {
+    const response = await fetch(`${baseUrl}/api/flights/flt_aa100/fares/Y`);
+    expect(response.status).toBe(200);
+    const fare = await response.json();
+    expect(fare).toMatchObject({ bookingClassCode: 'Y', currency: 'USD' });
+    expect(fare.baseFareAmount).toBeGreaterThan(0);
+  });
+
+  it('404s for an unknown booking class', async () => {
+    const response = await fetch(`${baseUrl}/api/flights/flt_aa100/fares/Z`);
+    expect(response.status).toBe(404);
+  });
 });
