@@ -39,4 +39,8 @@ export class FlightsService {
   findAll(): Flight[] {
     return SEEDED_FLIGHTS;
   }
+
+  findById(id: string): Flight | undefined {
+    return SEEDED_FLIGHTS.find((flight) => flight.id === id);
+  }
 }
