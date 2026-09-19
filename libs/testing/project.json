@@ -1,9 +1,0 @@
-{
-  "name": "@squawk/testing",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "libs/testing/src",
-  "projectType": "library",
-  "tags": ["type:testing"],
-  "// targets": "to see all targets run: nx show project @squawk/testing --web",
-  "targets": {}
-}
